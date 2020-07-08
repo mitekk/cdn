@@ -23,7 +23,10 @@
 const { select } = require("./cdn");
 
 async function main() {
-  const serve = await select();
+  const imageQuery = "orange";
+  for (let step = 0; step < 5; step++) {
+    const serve = await select();
+  }
 
   // bonus section
   // serve = ....

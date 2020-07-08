@@ -15,7 +15,12 @@ const CDN_SERVERS = [
   },
 ];
 
-var axiosInst = axios.create({
+const CDN_ORG = {
+  server: "http://localhost:40",
+  unreachable: 0,
+};
+
+const axiosInst = axios.create({
   timeout: 10,
 });
 
@@ -43,7 +48,7 @@ axiosInst.interceptors.response.use(
 /**
  * @returns Promise<path => Promise<any>>
  */
-async function select() {
+async function select(imageToQuery) {
   const byResTime = (a, b) => {
     if (a.responseTime < b.responseTime) {
       return -1;
@@ -62,7 +67,7 @@ async function select() {
     if (cdnServerIndex !== -1) {
       const cdnServer = CDN_SERVERS[cdnServerIndex];
 
-      if (cdnServer.unreachable > 1) {
+      if (cdnServer.unreachable === 1) {
         CDN_SERVERS.splice(cdnServerIndex, 1);
         console.info(`${server} was removed due to inactivity`);
       } else {
@@ -76,22 +81,28 @@ async function select() {
     return Promise.all(
       CDN_SERVERS.map((cdn) =>
         axiosInst.get("/stat", { baseURL: cdn.server }).catch((error) => {
+          // handle failures seperatly for each stat request
           if (error.code === "ECONNABORTED") {
             handleUnreachanble(error.config.baseURL);
+          } else {
+            console.error(error);
           }
         })
       )
     ).then((servers) => {
-      return servers
-        .filter((server) => server)
-        .sort(byResTime)
-        .pop();
+      return servers.filter((server) => server).sort(byResTime);
     });
   };
 
   try {
-    const fastestServer = await pingServers();
-    console.info(`fastest Server found: ${fastestServer.config.baseURL}`);
+    const servers = await pingServers();
+    if (servers && servers.length) {
+      console.info(`fastest Server found: ${servers.shift().config.baseURL}`);
+    } else {
+      console.info(
+        `no cdn server was found, switching to CDN_ORG: ${CDN_ORG.server}`
+      );
+    }
   } catch (error) {
     console.error(error);
   }
