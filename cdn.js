@@ -1,74 +1,100 @@
-const ping = require("ping");
+const axios = require("axios").default;
 
 const CDN_SERVERS = [
   {
-    url: "google.com",
+    server: "http://localhost:10",
     unreachable: 0,
   },
   {
-    url: "ynet.co.il",
+    server: "http://localhost:20",
     unreachable: 0,
   },
   {
-    url: "bbc.com",
-    unreachable: 0,
-  },
-  {
-    url: "scmp.com",
-    unreachable: 0,
-  },
-  {
-    url: "fakeNews.com",
-    unreachable: 0,
-  },
-  {
-    url: "reallyfakenews.com/",
+    server: "http://localhost:30",
     unreachable: 0,
   },
 ];
+
+var axiosInst = axios.create({
+  timeout: 10,
+});
+
+axiosInst.interceptors.request.use(
+  (req) => {
+    req.meta = req.meta || {};
+    req.meta.requestStartedAt = new Date().getTime();
+    return req;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+axiosInst.interceptors.response.use(
+  (res) => {
+    res.responseTime = new Date().getTime() - res.config.meta.requestStartedAt;
+    return res;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 /**
  * @returns Promise<path => Promise<any>>
  */
 async function select() {
   const byResTime = (a, b) => {
-    if (a.time < b.time) {
+    if (a.responseTime < b.responseTime) {
       return -1;
     }
-    if (a.time > b.time) {
+    if (a.responseTime > b.responseTime) {
       return 1;
     }
     return 0;
   };
 
-  const handleDead = (servers) => {
-    return servers.reduce((aliveServers, server) => {
-      if (server.alive) {
-        aliveServers.push(server);
-      } else {
-        const cdnServerIndex = CDN_SERVERS.findIndex((cdnServer) => {
-          cdnServer.url === server.host;
-        });
+  const handleUnreachanble = (server) => {
+    const cdnServerIndex = CDN_SERVERS.findIndex(
+      (cdn) => cdn.server === server
+    );
 
-        CDN_SERVERS[cdnServerIndex].unreachable > 1
-          ? CDN_SERVERS.splice(cdnServerIndex, 1)
-          : cdnServer.unreachable++;
+    if (cdnServerIndex !== -1) {
+      const cdnServer = CDN_SERVERS[cdnServerIndex];
+
+      if (cdnServer.unreachable > 1) {
+        CDN_SERVERS.splice(cdnServerIndex, 1);
+        console.info(`${server} was removed due to inactivity`);
+      } else {
+        cdnServer.unreachable++;
+        console.info(`${server} is unreachable`);
       }
-      return aliveServers;
-    }, []);
+    }
   };
 
-  Promise.all(
-    CDN_SERVERS.map((server) =>
-      ping.promise.probe(server.url, {
-        timeout: 10,
-      })
-    )
-  ).then((servers) => {
-    servers = handleDead(servers);
-    servers = servers.sort(byResTime);
-    console.log(servers);
-  });
+  const pingServers = () => {
+    return Promise.all(
+      CDN_SERVERS.map((cdn) =>
+        axiosInst.get("/stat", { baseURL: cdn.server }).catch((error) => {
+          if (error.code === "ECONNABORTED") {
+            handleUnreachanble(error.config.baseURL);
+          }
+        })
+      )
+    ).then((servers) => {
+      return servers
+        .filter((server) => server)
+        .sort(byResTime)
+        .pop();
+    });
+  };
+
+  try {
+    const fastestServer = await pingServers();
+    console.info(`fastest Server found: ${fastestServer.config.baseURL}`);
+  } catch (error) {
+    console.error(error);
+  }
 
   return;
 }

@@ -4,9 +4,11 @@
   "description": "",
   "main": "app.js",
   "dependencies": {
-    "ping": "^0.2.3"
+    "axios": "^0.19.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "json-server": "^0.16.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
