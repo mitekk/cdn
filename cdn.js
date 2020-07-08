@@ -48,7 +48,7 @@ axiosInst.interceptors.response.use(
 /**
  * @returns Promise<path => Promise<any>>
  */
-async function select(imageToQuery) {
+async function select() {
   const byResTime = (a, b) => {
     if (a.responseTime < b.responseTime) {
       return -1;
@@ -107,7 +107,21 @@ async function select(imageToQuery) {
     console.error(error);
   }
 
-  return;
+  return (imageToQuery) => {
+    return axiosInst
+      .get(
+        "/image",
+        { baseURL: "http://localhost:30" },
+        {
+          headers: {
+            imageToQuery,
+          },
+        }
+      )
+      .catch((err) => {
+        console.log(err);
+      });
+  };
 }
 
 module.exports = { select };

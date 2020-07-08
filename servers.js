@@ -9,11 +9,16 @@ const middlewares = jsonServer.defaults();
 
   server.get("/image", (request, response) => {
     const host = `http://localhost:${request.client.localPort}`;
+    const imageQuery = request.get("imageQuery");
 
     if (request.method === "GET") {
       const serverSources = require("./sources")(host);
       if (serverSources && serverSources.images) {
-        response.status(200).jsonp(serverSources.images);
+        response
+          .status(200)
+          .jsonp(
+            serverSources.images.filter((image) => image.title === imageQuery)
+          );
       } else {
         response.status(404).send("Not Found");
       }
