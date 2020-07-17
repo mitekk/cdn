@@ -25,7 +25,8 @@ const { select } = require("./cdn");
 async function main() {
   const imageQuery = "orange";
   const serve = await select();
-  console.log(await serve(imageQuery));
+  await serve(imageQuery);
+  console.log("Done!");
 }
 
 module.exports = { main };

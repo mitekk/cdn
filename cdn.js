@@ -105,7 +105,7 @@ async function select() {
     let requestedImage;
 
     const findImageFromCDN = async () => {
-      let cdnImage = {};
+      let chosenCDN;
       for (const server of availableCDNServers) {
         const {
           config: { baseURL },
@@ -120,28 +120,40 @@ async function select() {
           });
 
         if (cdnImageResponse) {
-          cdnImage = { server, cdnImageURL: cdnImageResponse.data.url };
+          chosenCDN = { server, meta: cdnImageResponse.data };
           break;
         }
       }
 
-      return cdnImage;
+      return chosenCDN;
     };
 
-    const { server, cdnImageURL } = await findImageFromCDN(availableCDNServers);
+    const logServing = (title, cdnServer) => {
+      if (cdnServer) {
+        console.info(`"${title}" served from CDN: ${cdnServer}`);
+      } else {
+        console.info(`"${title}" served from CDN_ORG: ${CDN_ORG.server}`);
+      }
+    };
 
-    if (server && cdnImageURL) {
-      requestedImage = cdnImageURL;
-      console.info(`served from CDN: ${server.config.baseURL}`);
+    const serveCandidate = await findImageFromCDN(availableCDNServers);
+
+    if (serveCandidate) {
+      const {
+        server,
+        meta: { title, url },
+      } = serveCandidate;
+      requestedImage = url;
+      logServing(title, server.config.baseURL);
     } else {
-      console.info(
-        `no cdn server was found, switching to CDN_ORG: ${CDN_ORG.server}`
-      );
       requestedImage = await axiosInst
         .get(`/images/${imageToQuery}`, {
           baseURL: CDN_ORG.server,
         })
-        .then((response) => response.data.url);
+        .then((response) => {
+          logServing(response.data.title);
+          return response.data.url;
+        });
     }
 
     return requestedImage;
