@@ -68,11 +68,11 @@ const cdnOrganization = {
           cdnServer.images.filter((image) => image.title.includes(queryText));
 
         if (serverImages && serverImages.length) {
-          response
-            .status(200)
-            .jsonp(
-              serverImages.filter((image) => image.title.includes(queryText))
-            );
+          response.status(200).jsonp(
+            serverImages
+              .filter((image) => image.title.includes(queryText))
+              .pop() // pick last one for simplicity
+          );
         } else {
           response.status(404).send(`No match found for '${queryText}'`);
         }

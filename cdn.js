@@ -101,26 +101,50 @@ async function select() {
     console.error(error);
   }
 
-  return (imageToQuery) => {
-    let imageRequest;
+  return async (imageToQuery) => {
+    let requestedImage;
 
-    if (availableCDNServers) {
-      const {
-        config: { baseURL },
-      } = availableCDNServers.pop();
-      imageRequest = axiosInst.get(`/images/${imageToQuery}`, { baseURL });
+    const findImageFromCDN = async () => {
+      let cdnImage = {};
+      for (const server of availableCDNServers) {
+        const {
+          config: { baseURL },
+        } = server;
+
+        const cdnImageResponse = await axiosInst
+          .get(`/images/${imageToQuery}`, {
+            baseURL,
+          })
+          .catch((error) => {
+            console.info(`${baseURL}: ${error.response.data}`);
+          });
+
+        if (cdnImageResponse) {
+          cdnImage = { server, cdnImageURL: cdnImageResponse.data.url };
+          break;
+        }
+      }
+
+      return cdnImage;
+    };
+
+    const { server, cdnImageURL } = await findImageFromCDN(availableCDNServers);
+
+    if (server && cdnImageURL) {
+      requestedImage = cdnImageURL;
+      console.info(`served from CDN: ${server.config.baseURL}`);
     } else {
       console.info(
         `no cdn server was found, switching to CDN_ORG: ${CDN_ORG.server}`
       );
-      imageRequest = axiosInst.get(`/images/${imageToQuery}`, {
-        baseURL: CDN_ORG.server,
-      });
+      requestedImage = await axiosInst
+        .get(`/images/${imageToQuery}`, {
+          baseURL: CDN_ORG.server,
+        })
+        .then((response) => response.data.url);
     }
 
-    return imageRequest.catch((err) => {
-      console.log(err);
-    });
+    return requestedImage;
   };
 }
 
